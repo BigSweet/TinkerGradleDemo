@@ -137,11 +137,11 @@ ext {
     //for normal build
     //old apk file to build patch apk
 
-    tinkerOldApkPath = "${bakPath}/app-release-0429-15-58-52.apk"
+    tinkerOldApkPath = "${bakPath}/app-release-0429-16-28-46.apk"
     //proguard mapping file to build patch apk
-    tinkerApplyMappingPath = "${bakPath}/app-release-0429-15-58-52-mapping.txt"
+    tinkerApplyMappingPath = "${bakPath}/app-release-0429-16-28-46-mapping.txt"
     //resource R.txt to build patch apk, must input if there is resource changed
-    tinkerApplyResourcePath = "${bakPath}/app-release-0429-15-58-52-R.txt"
+    tinkerApplyResourcePath = "${bakPath}/app-release-0429-16-28-46-R.txt"
 
     //only use for build all flavor, if not, just ignore this field
     tinkerBuildFlavorDirectory = "${bakPath}/app-1018-17-32-47"
@@ -161,7 +161,7 @@ def getApplyResourceMappingPath() {
 }
 
 def getTinkerIdValue() {
-    return hasProperty("TINKER_ID") ? TINKER_ID : gitSha()
+    return "1.0"
 }
 
 def buildWithTinker() {
@@ -238,7 +238,7 @@ if (buildWithTinker()) {
              * we can use git rev, svn rev or simply versionCode.
              * we will gen the tinkerId in your manifest automatic
              */
-            tinkerId = "1.0"
+            tinkerId = getTinkerIdValue()
 
             /**
              * if keepDexApply is true, class in which dex refer to the old apk.
