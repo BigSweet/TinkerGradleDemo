@@ -1,25 +1,22 @@
 apply plugin: 'com.android.application'
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:23.1.1'
-    //可选，用于生成application类
-    compile("com.tencent.tinker:tinker-android-lib:${TINKER_VERSION}") { changing = true }
-    //tinker的核心库
-    provided("com.tencent.tinker:tinker-android-anno:${TINKER_VERSION}") { changing = true }
-    compile 'com.android.support:multidex:1.0.1'
-    //use to test multiDex
-    //    compile group: 'com.google.guava', name: 'guava', version: '19.0'
-    //    compile "org.scala-lang:scala-library:2.11.7"
-    //use for local maven test
-    //    compile("com.tencent.tinker:tinker-android-loader:${TINKER_VERSION}") { changing = true }
-    //    compile("com.tencent.tinker:aosp-dexutils:${TINKER_VERSION}") { changing = true }
-    //    compile("com.tencent.tinker:bsdiff-util:${TINKER_VERSION}") { changing = true }
-    //    compile("com.tencent.tinker:tinker-commons:${TINKER_VERSION}") { changing = true }
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    testImplementation 'junit:junit:4.12'
+    implementation "androidx.appcompat:appcompat:1.1.0"
+    api("com.tencent.tinker:tinker-android-lib:${TINKER_VERSION}") { changing = true }
+
+    // Maven local cannot handle transist dependencies.
+    implementation("com.tencent.tinker:tinker-android-loader:${TINKER_VERSION}") { changing = true }
+
+    annotationProcessor("com.tencent.tinker:tinker-android-anno:${TINKER_VERSION}") { changing = true }
+    compileOnly("com.tencent.tinker:tinker-android-anno:${TINKER_VERSION}") { changing = true }
+    compileOnly("com.tencent.tinker:tinker-android-anno-support:${TINKER_VERSION}") { changing = true }
+
+    implementation "androidx.multidex:multidex:2.0.1"
+
 }
 
-//废弃，因为我们吧tinker_id写死了，这里的作用是把git的提交记录用作tinker_id的版本
 def gitSha() {
     try {
         String gitRev = 'git rev-parse --short HEAD'.execute(null, project.rootDir).text.trim()
@@ -32,12 +29,11 @@ def gitSha() {
     }
 }
 
-//配置java版本
 def javaVersion = JavaVersion.VERSION_1_7
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.2"
+    compileSdkVersion 28
+    buildToolsVersion '28.0.3'
 
     compileOptions {
         sourceCompatibility javaVersion
@@ -47,37 +43,33 @@ android {
     dexOptions {
         jumboMode = true
     }
-    //配置自己的签名文件，签名文件的生成和导入可以去百度，本篇不讲解
-    signingConfigs {
-        release {
-            try {
-                keyAlias 'china'
-                keyPassword '123456'
-                storeFile file('D:/work/release.jks')
-                storePassword '123456'
-            } catch (ex) {
-                throw new InvalidUserDataException(ex.toString())
-            }
 
-        }
+    signingConfigs {
         debug {
-            storeFile file('D:/work/debug.jks')
-            keyAlias 'china'
-            keyPassword '123456'
-            storePassword '123456'
+            keyAlias "key0"
+            keyPassword "123456"
+            storeFile file('robustsign2')
+            storePassword "123456"
+        }
+        release {
+            keyAlias "key0"
+            keyPassword "123456"
+            storeFile file('robustsign2')
+            storePassword "123456"
         }
     }
 
     defaultConfig {
         applicationId "tinker.sample.android"
-        minSdkVersion 10
-        targetSdkVersion 22
+        minSdkVersion 14
+        targetSdkVersion 26
         versionCode 1
         versionName "1.0.0"
         /**
          * you can use multiDex and install it in your ApplicationLifeCycle implement
          */
         multiDexEnabled true
+        multiDexKeepProguard file("tinker_multidexkeep.pro")
         /**
          * buildConfig can change during patch!
          * we can use the newly value when patch
@@ -88,11 +80,12 @@ android {
          * client version would update with patch
          * so we can get the newly git version easily!
          */
-        buildConfigField "String", "TINKER_ID", "\"1.0\""
-        buildConfigField "String", "PLATFORM",  "\"all\""
+        buildConfigField "String", "TINKER_ID", "\"${getTinkerIdValue()}\""
+        buildConfigField "String", "PLATFORM", "\"all\""
     }
 
 //    aaptOptions{
+//        additionalParameters "--emit-ids", "${project.file('public.txt')}"
 //        cruncherEnabled false
 //    }
 
@@ -111,19 +104,22 @@ android {
         release {
             minifyEnabled true
             signingConfig signingConfigs.release
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), project.file('proguard-rules.pro')
         }
         debug {
             debuggable true
             minifyEnabled false
             signingConfig signingConfigs.debug
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
     sourceSets {
         main {
             jniLibs.srcDirs = ['libs']
         }
+    }
+
+    packagingOptions {
+        exclude "/META-INF/**"
     }
 }
 
@@ -134,18 +130,18 @@ def bakPath = file("${buildDir}/bakApk/")
  * use tinkerPatchRelease -POLD_APK=  -PAPPLY_MAPPING=  -PAPPLY_RESOURCE= to build patch
  * add apk from the build/bakApk
  */
-//老版本的文件所在的位置，大家也可以动态配置，不用每次都在这里修改
 ext {
     //for some reason, you may want to ignore tinkerBuild, such as instant run debug build?
     tinkerEnabled = true
 
     //for normal build
     //old apk file to build patch apk
-    tinkerOldApkPath = "${bakPath}/app-release-1012-11-23-07.apk"
+
+    tinkerOldApkPath = "${bakPath}/app-release-0429-15-58-52.apk"
     //proguard mapping file to build patch apk
-    tinkerApplyMappingPath = "${bakPath}/app-release-1012-11-23-07-mapping.txt"
+    tinkerApplyMappingPath = "${bakPath}/app-release-0429-15-58-52-mapping.txt"
     //resource R.txt to build patch apk, must input if there is resource changed
-    tinkerApplyResourcePath = "${bakPath}/app-release-1012-11-23-07-R.txt"
+    tinkerApplyResourcePath = "${bakPath}/app-release-0429-15-58-52-R.txt"
 
     //only use for build all flavor, if not, just ignore this field
     tinkerBuildFlavorDirectory = "${bakPath}/app-1018-17-32-47"
@@ -163,13 +159,13 @@ def getApplyMappingPath() {
 def getApplyResourceMappingPath() {
     return hasProperty("APPLY_RESOURCE") ? APPLY_RESOURCE : ext.tinkerApplyResourcePath
 }
-//废弃
-/*def getTinkerIdValue() {
+
+def getTinkerIdValue() {
     return hasProperty("TINKER_ID") ? TINKER_ID : gitSha()
-}*/
+}
 
 def buildWithTinker() {
-    return hasProperty("TINKER_ENABLE") ? TINKER_ENABLE : ext.tinkerEnabled
+    return hasProperty("TINKER_ENABLE") ? Boolean.parseBoolean(TINKER_ENABLE) : ext.tinkerEnabled
 }
 
 def getTinkerBuildFlavorDirectory() {
@@ -201,7 +197,7 @@ if (buildWithTinker()) {
          *         it won't crash, but these changes can't effect. you may ignore it
          * case 5: resources.arsc has changed, but we don't use applyResourceMapping to build
          */
-        ignoreWarning = true
+        ignoreWarning = false
 
         /**
          * optional，default 'true'
@@ -242,13 +238,33 @@ if (buildWithTinker()) {
              * we can use git rev, svn rev or simply versionCode.
              * we will gen the tinkerId in your manifest automatic
              */
-            tinkerId = "1.0"/*getTinkerIdValue()*/
+            tinkerId = "1.0"
 
             /**
              * if keepDexApply is true, class in which dex refer to the old apk.
              * open this can reduce the dex diff file size.
              */
             keepDexApply = false
+
+            /**
+             * optional, default 'false'
+             * Whether tinker should treat the base apk as the one being protected by app
+             * protection tools.
+             * If this attribute is true, the generated patch package will contain a
+             * dex including all changed classes instead of any dexdiff patch-info files.
+             */
+            isProtectedApp = false
+
+            /**
+             * optional, default 'false'
+             * Whether tinker should support component hotplug (add new component dynamically).
+             * If this attribute is true, the component added in new apk will be available after
+             * patch is successfully loaded. Otherwise an error would be announced when generating patch
+             * on compile-time.
+             *
+             * <b>Notice that currently this feature is incubating and only support NON-EXPORTED Activity</b>
+             */
+            supportHotplugComponent = false
         }
 
         dex {
@@ -363,10 +379,12 @@ if (buildWithTinker()) {
     }
 
     List<String> flavors = new ArrayList<>();
-    project.android.productFlavors.each {flavor ->
+    project.android.productFlavors.each { flavor ->
         flavors.add(flavor.name)
     }
     boolean hasFlavors = flavors.size() > 0
+    def date = new Date().format("MMdd-HH-mm-ss")
+
     /**
      * bak apk and mapping
      */
@@ -375,7 +393,7 @@ if (buildWithTinker()) {
          * task type, you want to bak
          */
         def taskName = variant.name
-        def date = new Date().format("MMdd-HH-mm-ss")
+
         tasks.all {
             if ("assemble${taskName.capitalize()}".equalsIgnoreCase(it.name)) {
 
@@ -385,19 +403,40 @@ if (buildWithTinker()) {
                         def newFileNamePrefix = hasFlavors ? "${fileNamePrefix}" : "${fileNamePrefix}-${date}"
 
                         def destPath = hasFlavors ? file("${bakPath}/${project.name}-${date}/${variant.flavorName}") : bakPath
-                        from variant.outputs.outputFile
+
+                        if (variant.metaClass.hasProperty(variant, 'packageApplicationProvider')) {
+                            def packageAndroidArtifact = variant.packageApplicationProvider.get()
+                            if (packageAndroidArtifact != null) {
+                                try {
+                                    from new File(packageAndroidArtifact.outputDirectory.getAsFile().get(), variant.outputs.first().apkData.outputFileName)
+                                } catch (Exception e) {
+                                    from new File(packageAndroidArtifact.outputDirectory, variant.outputs.first().apkData.outputFileName)
+                                }
+                            } else {
+                                from variant.outputs.first().mainOutputFile.outputFile
+                            }
+                        } else {
+                            from variant.outputs.first().outputFile
+                        }
+
                         into destPath
                         rename { String fileName ->
                             fileName.replace("${fileNamePrefix}.apk", "${newFileNamePrefix}.apk")
                         }
 
-                        from "${buildDir}/outputs/mapping/${variant.dirName}/mapping.txt"
+                        def dirName = variant.dirName
+                        if (hasFlavors) {
+                            dirName = taskName
+                        }
+                        from "${buildDir}/outputs/mapping/${dirName}/mapping.txt"
                         into destPath
                         rename { String fileName ->
                             fileName.replace("mapping.txt", "${newFileNamePrefix}-mapping.txt")
                         }
 
-                        from "${buildDir}/intermediates/symbols/${variant.dirName}/R.txt"
+                        from "${buildDir}/intermediates/symbols/${dirName}/R.txt"
+                        from "${buildDir}/intermediates/symbol_list/${dirName}/R.txt"
+                        from "${buildDir}/intermediates/runtime_symbol_list/${dirName}/R.txt"
                         into destPath
                         rename { String fileName ->
                             fileName.replace("R.txt", "${newFileNamePrefix}-R.txt")
@@ -444,6 +483,23 @@ if (buildWithTinker()) {
 
                 }
             }
+        }
+    }
+}
+
+
+task sortPublicTxt() {
+    doLast {
+        File originalFile = project.file("public.txt")
+        File sortedFile = project.file("public_sort.txt")
+        List<String> sortedLines = new ArrayList<>()
+        originalFile.eachLine {
+            sortedLines.add(it)
+        }
+        Collections.sort(sortedLines)
+        sortedFile.delete()
+        sortedLines.each {
+            sortedFile.append("${it}\n")
         }
     }
 }
