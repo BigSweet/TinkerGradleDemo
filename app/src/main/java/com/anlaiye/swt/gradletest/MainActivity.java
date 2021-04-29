@@ -47,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void loadApk() {
-        String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/patch_signed_7zip.apk";
+        String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/app-release-patch_signed_7zip.apk";
         File file = new File(path);
         if (file.exists()) {
             Toast.makeText(this, "补丁已经存在", Toast.LENGTH_SHORT).show();
